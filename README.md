@@ -9,6 +9,13 @@ Logs real-world attack data for threat analysis and detection engineering.
 - Grafana Dashboard (Phase 3)
 - AWS Lambda auto-response (Phase 4)
 
+## Architecture
+- Cowrie honeypot (EC2 t3.micro) → JSON logs → Wazuh agent
+- Wazuh manager (EC2 m7i-flex.large) → parses alerts → triggers Lambda
+- Lambda function → adds attacker IP to Network ACL deny rules
+- Grafana dashboard → visualizes attack data from OpenSearch
+
+
 ## Status
 - ✅ Phase 1 - Cowrie honeypot live on AWS EC2
 - ✅ Phase 2 - Wazuh SIEM connected, ingesting Cowrie logs
