@@ -14,5 +14,9 @@ Logs real-world attack data for threat analysis and detection engineering.
 - ✅ Phase 2 - Wazuh SIEM connected, ingesting Cowrie logs
 - MITRE ATT&CK mapping active
 - ✅ Phase 3 - Grafana dashboard live with 4 panels
-  - Attack timeline, Top attacker IPs, MITRE ATT&CK tactics, Top attempted usernames
+  - Attack timeline, Top attacker IPs, MITRE ATT&CK tactics, Top attempted username
+- ✅ Phase 4 - AWS Lambda auto-block pipeline complete
+  - Custom Wazuh decoder and rules for Cowrie logs
+  - Lambda function blocks attacking IPs in Network ACL automatically
+  - Full pipeline: Cowrie → Wazuh → Lambda → NACL blocks
 
