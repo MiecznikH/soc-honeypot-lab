@@ -26,4 +26,4 @@ Logs real-world attack data for threat analysis and detection engineering.
   - Custom Wazuh decoder and rules for Cowrie logs
   - Lambda function blocks attacking IPs in Network ACL automatically
   - Full pipeline: Cowrie → Wazuh → Lambda → NACL blocks
-
+- ✅ Phase 5 - Added honeyfs deception layer with fake credentials and bash history
