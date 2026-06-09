@@ -1,7 +1,7 @@
 # Threat Analysis: Large-Scale Credential Stuffing from Google Cloud
 **Attacker IP:** 136.113.34.125  
 **Date:** 2026-06-07  
-**Duration:** 24 hours sustained  
+**Duration:** ~1 hour sustained burst  
 **Total events:** 63,672  
 **Login attempts:** 7,958  
 **Source:** Google LLC (GCP), United States  
@@ -55,10 +55,11 @@ resources available.
 ## Attack Behaviour
 
 ### Phase 1 — Initial Access (T1110.001 - Brute Force: Password Guessing)
-7,958 unique credential pairs attempted over 24 hours at ~1 attempt per 11 
-seconds. The consistent rate suggests deliberate throttling to avoid triggering 
-rate-based detection systems — more sophisticated than the El Salvador campaign 
-which ran at ~3 attempts per second.
+7,958 unique credential pairs attempted within approximately 1 hour at 
+~17 connections per second. This is an aggressive high-speed flood with 
+no attempt at throttling or evasion — the attacker prioritised speed over 
+stealth, exhausting their wordlist in under 30 minutes then continuing 
+to hammer the port.
 
 ### Phase 2 — Execution (T1059 - Command and Scripting Interpreter)
 Every successful login immediately executed:
@@ -112,8 +113,11 @@ high-confidence malicious regardless of source IP or geography.
 
 Lambda auto-block pipeline added NACL deny rule for 136.113.34.125 upon 
 first Wazuh alert. However, the attacker's 11-second interval meant 
-approximately 7,958 attempts completed before or around the time of blocking, 
-suggesting the block fired but the wordlist run had largely completed by then.
+approximately 7,958 attempts completed before or around the time of blocking.
+
+At 17 connections per second, the entire 8,000-password wordlist was 
+exhausted in under 30 minutes. The Lambda block fired but was unable to 
+prevent the bulk of attempts given the attack velocity.
 
 This highlights a potential improvement: trigger blocking on 
 `cowrie.session.connect` (level 6) rather than `cowrie.login.success` 
