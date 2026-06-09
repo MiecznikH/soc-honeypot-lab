@@ -11,44 +11,32 @@ detection engineering skills using real-world attack data.
 ---
 
 ## Architecture
-Internet Attackers
-│
-▼
-┌─────────────────────────────────────────────┐
-│  Cowrie SSH Honeypots (AWS EC2)             │
-│  ├── cowrie-honeypot    (us-east-1)         │
-│  └── cowrie-honeypot-west (eu-west-1)       │
-└─────────────────┬───────────────────────────┘
-│ JSON logs
-▼
-┌─────────────────────────────────────────────┐
-│  Wazuh SIEM (AWS EC2 m7i-flex.large)        │
-│  ├── Custom decoders + detection rules      │
-│  ├── MITRE ATT&CK auto-mapping              │
-│  └── OpenSearch backend                     │
-└─────────────────┬───────────────────────────┘
-│ Alert webhook
-▼
-┌─────────────────────────────────────────────┐
-│  AWS Lambda (honeypot-ip-blocker)           │
-│  ├── AbuseIPDB threat intel enrichment      │
-│  ├── Geolocation + ISP lookup               │
-│  └── Auto-block via Network ACL             │
-└─────────────────┬───────────────────────────┘
-│ Enriched logs
-▼
-┌─────────────────────────────────────────────┐
-│  Grafana Dashboard                          │
-│  ├── Attack timeline                        │
-│  ├── Top attacker IPs                       │
-│  ├── Country of attack origin               │
-│  ├── MITRE ATT&CK tactics                   │
-│  ├── Top attempted usernames                │
-│  ├── Attacks by sensor                      │
-│  └── Live threat intelligence feed          │
-└─────────────────────────────────────────────┘
 
----
+```mermaid
+flowchart TD
+    A[🌍 Internet Attackers] --> B
+    A --> C
+
+    B[🪤 cowrie-honeypot\nus-east-1]
+    C[🪤 cowrie-honeypot-west\neu-west-1]
+
+    B --> D[📊 Wazuh SIEM\nAWS EC2 m7i-flex.large]
+    C --> D
+
+    D --> E[⚡ AWS Lambda\nhoneypot-ip-blocker]
+
+    E --> F[🔍 AbuseIPDB\nThreat Enrichment]
+    E --> G[🚫 Network ACL\nAuto-Block]
+    E --> H[📝 CloudWatch\nEnriched Logs]
+
+    H --> I[📈 Grafana Dashboard]
+
+    I --> J[Attack Timeline]
+    I --> K[Top Attacker IPs]
+    I --> L[Country of Origin]
+    I --> M[MITRE ATT&CK]
+    I --> N[Threat Intel Feed]
+```
 
 ## Stack
 
