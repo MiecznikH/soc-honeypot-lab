@@ -1,0 +1,12 @@
+# Wrażliwe — NIGDY na publiczne repo
+terraform.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.pem
+*.key
+
+# Śmieci
+crash.log
+*.backup
