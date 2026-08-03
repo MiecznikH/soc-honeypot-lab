@@ -1,12 +1,27 @@
 # SOC Honeypot Lab
 
-A fully automated threat detection and response pipeline hosted on AWS. 
-Real SSH honeypots catch live attacks from across the internet, feed them 
-into a SIEM, enrich attacker IPs with threat intelligence, and — on the 
-protected sensor — block them automatically, without human intervention.
+Cowrie SSH honeypots across two AWS regions feeding a self-hosted Wazuh SIEM, with automated response and Grafana dashboards.
 
-Built as a portfolio project to demonstrate practical SOC, cloud, and 
-detection engineering skills using real-world attack data.
+Everything below is written from traffic these sensors captured. Each analysis starts from raw session telemetry and ends with a defensive conclusion.
+
+---
+
+## Analyses
+
+**[Linux/IoT botnet loader with a `/dev/tcp` telemetry gap](analyses/threat-analysis-43.100.32.28.md)**
+A fully automated compromise attempt delivering a ~3.8 MB UPX-packed binary from a hardcoded C2. The loader falls back through `curl` → `wget` → a raw Bash `/dev/tcp` socket, guaranteeing delivery on minimal systems. The third path evades Cowrie's file-capture hooks entirely, so the payload was requested but never written to disk. **The blind spot is in the telemetry source, not the detection rule** — which changes where you fix it. Assessed Mirai/Gafgyt on behaviour, medium confidence; binary not recovered.
+
+**[Credential stuffing from Google Cloud, correlated by HASSH](analyses/threat-analysis-136.113.34.125.md)**
+7,958 credential attempts in roughly an hour. The client presented HASSH `01ca35584ad5a1b66cf6a9846b5b2821` — identical to a campaign six days earlier from a different country and a different sensor. Source addresses rotated; the client fingerprint did not. Cross-sensor, cross-campaign attribution from a single field.
+
+**[Malware deployment attempt from Alibaba Cloud](analyses/threat-analysis-101.200.132.92.md)**
+Post-exploitation staging traced end to end: architecture fingerprinting via `cat /bin/echo`, a benign-looking `echo 1 > /dev/null` prefix used as sandbox-evasion cover, then the multi-fallback download chain detached with `nohup`. Same incident as the loader analysis above, read from the intrusion side rather than the payload side — one compromise, two vantage points, not two campaigns.
+
+**[Silent credential harvester](analyses/threat-analysis-118.178.144.41.md)**
+One successful login, zero commands, immediate disconnect. A validation pass rather than an intrusion — the credentials are banked for a later wave. Documented alongside the noisy campaigns because the absence of post-exploitation activity is itself the signature.
+
+**[Credential stuffing campaign, El Salvador](analyses/threat-analysis-200.31.165.230.md)**
+300+ attempts in three minutes, a new TCP connection per credential pair to defeat session-based lockout. Wordlist traced to breach-compilation material of the MySpace/Facebook era.
 
 ---
 
@@ -38,128 +53,55 @@ flowchart TD
     I --> N[Threat Intel Feed]
 ```
 
-## Stack
-
-| Component | Technology |
-|---|---|
-| Honeypot | Cowrie 3.0 (SSH/Telnet) |
-| SIEM | Wazuh 4.11.2 + OpenSearch |
-| Visualization | Grafana |
-| Auto-response | AWS Lambda (Python) |
-| Threat Intel | AbuseIPDB API |
-| Network blocking | AWS Network ACL |
-| Infrastructure | AWS EC2, VPC, IAM, CloudWatch |
+- **Sensors** — Cowrie on EC2 in two regions. Real admin SSH is moved to a non-standard port and 22 is redirected to Cowrie via `iptables`, so the decoy owns the port attackers actually target.
+- **SIEM** — Wazuh 4.11.2 (manager, indexer, dashboard), agent version pinned and held with `apt-mark hold`.
+- **Log pipeline** — the Wazuh agent tails `cowrie.json` as JSON, configured at bootstrap. Without that `<localfile>` block the SIEM stays green while receiving nothing of value.
+- **Automated response** — Lambda enriching source addresses against AbuseIPDB and pushing NACL denies, wired to the us-east-1 sensor only. us-west-1 runs unprotected, which is why the high-volume campaigns below all landed there: they ended when the attacker ran out of wordlist, not when a block fired. Evidence in [`screenshots/`](screenshots/).
+- **Infrastructure** — Terraform in [`terraform/`](terraform/), full bootstrap in [`templates/honeypot_userdata.sh.tpl`](terraform/templates/honeypot_userdata.sh.tpl).
 
 ---
 
-## Features
+## Detections
 
-- **Dual-sensor deployment** across two AWS regions (us-east-1, us-west-1) for geographic attack correlation
-- **Real-time threat enrichment** — every attacker IP automatically scored against AbuseIPDB, returning country, ISP, abuse confidence score, and prior report count
-- **Automated IP blocking** — Lambda fires on Wazuh alerts from the us-east-1 sensor and adds the attacker IP to a Network ACL deny list within seconds; us-west-1 runs unprotected as an uncontrolled reference sample, which is what makes the volume comparison between the two sensors meaningful
-- **Custom Wazuh detection rules** mapped to MITRE ATT&CK framework
-- **Cross-sensor attacker attribution** via HASSH SSH client fingerprinting
-- **Full attack chain logging** — credentials attempted, commands executed, malware download attempts, C2 communication
+Sigma rules in [`detections/`](detections/), mapped to MITRE ATT&CK:
 
----
+| Rule | Technique | Covers | Level |
+|---|---|---|---|
+| [File Transfer to Cowrie SSH Honeypot](detections/cowrie_file_transfer_to_honeypot.yml) | [T1105](https://attack.mitre.org/techniques/T1105/) — Ingress Tool Transfer | `curl` / `wget` downloads, SCP/SFTP pushes | high |
+| [Bash `/dev/tcp` Socket Used for File Transfer](detections/cowrie_dev_tcp_socket_transfer.yml) | [T1105](https://attack.mitre.org/techniques/T1105/) — Ingress Tool Transfer, [T1059.004](https://attack.mitre.org/techniques/T1059/004/) — Unix Shell | raw socket fallback, no file event produced | high |
 
-## Dashboard
-
-### All-time view
-![All time dashboard](screenshots/alltimedashboard.png)
-
-### Last 2 days
-![Last 2 days](screenshots/last2daysdashboard.png)
-
-### West sensor — last 2 days
-![West sensor dashboard](screenshots/westdashboardlast2days.png)
-
-### Threat Intelligence Feed
-![Threat intel feed](screenshots/threatintelfeedcloseup.png)
-
-### Country of Attack Origin
-![Country of origin](screenshots/countryoforigin.png)
-
-### Attacks by Sensor
-![Attacks by sensor](screenshots/attacksbysensor.png)
+Both log sources are `cowrie` / `ssh`, but they read different telemetry, and that split is the point. The first rule matches file events, which Cowrie only emits for transfers it instruments. The loader analysed above defeated exactly that by falling back to a raw Bash socket — requested its payload, and nothing was ever written to the download store. The second rule matches command input instead, which still records the attempt. Neither rule covers the other's path; deployed together they cover the whole fallback chain.
 
 ---
 
-## Infrastructure
+## Post-mortem
 
-### EC2 Instances running
-![Instances](screenshots/instancerunning.png)
+Two failures are recorded here rather than hidden, because the failure modes carry more transferable lesson than the happy path.
 
-### Lambda function
-![Lambda](screenshots/lambdatest.png)
+**Restart cascade.** After a full stop/start, public addresses changed and the agent lost its manager; the Grafana Elasticsearch plugin was killed by its own auto-updater writing into a read-only bundled directory; and the agent was shipping `journald` but not `cowrie.json`, so the SIEM was healthy and empty at the same time.
 
-### Network ACL blocklist
-![NACL](screenshots/nacldenylist.png)
+*Fixes:* Elastic IP on the manager so the agent's target never moves, Wazuh agent version pinned and held, Cowrie pinned to a git ref, and the honeypot rebuilt in Terraform so it is reproducible instead of hand-tuned.
 
----
-
-## Threat Analysis Reports
-
-Real attack investigations conducted using data collected by this lab:
-
-### [1. Credential Stuffing Campaign — El Salvador (2026-06-01)](analyses/threat-analysis-200.31.165.230.md)
-Automated botnet from a compromised Salvadoran ISP machine cycling through 
-300+ passwords against the root account at 3 attempts/second. HASSH fingerprint 
-`01ca35584ad5a1b66cf6a9846b5b2821` identified as a key IOC.
-
-### [2. Large-Scale GCP Credential Flood — United States (2026-06-07)](analyses/threat-analysis-136.113.34.125.md)
-63,672 events in a single hour from a Google Cloud instance — ~18 events 
-per second sustained for 60 minutes, across 7,958 login attempts. Landed on 
-the unprotected us-west-1 sensor, so nothing stopped it: the campaign ended 
-when the attacker exhausted their wordlist, not when a block fired. 
-**HASSH fingerprint matched the June 1st El Salvador campaign**, linking both 
-attacks to the same malware kit or operator despite different source countries 
-and a 6-day gap. Cross-sensor attribution via HASSH demonstrated.
-
-### [3. Malware Deployment Attempt — China/Alibaba Cloud (2026-06-03)](analyses/threat-analysis-101.200.132.92.md)
-Most technically sophisticated attack observed. Post-authentication malware 
-staging using a 3-fallback downloader (curl → wget → raw TCP), UPX-packed 
-binary, base64-encoded C2 config, and a clean C2 server on Alibaba Cloud HK 
-suggesting deliberate infrastructure rotation. Consistent with XMRig 
-cryptominer or Mirai botnet deployment.
-
-**MITRE ATT&CK techniques observed across all campaigns:**
-
-| ID | Technique |
-|---|---|
-| T1110.001 | Brute Force: Password Guessing |
-| T1078 | Valid Accounts |
-| T1059.004 | Unix Shell |
-| T1082 | System Information Discovery |
-| T1105 | Ingress Tool Transfer |
-| T1027 | Obfuscated Files or Information |
-| T1583.006 | Acquire Infrastructure: Web Services |
-| T1036 | Masquerading |
-| T1496 | Resource Hijacking (intended) |
+**Bootstrap halted mid-run.** A rebuilt instance came up healthy, accepted SSH, and had never registered its agent — it did not appear on the manager at all. The bootstrap is fail-fast, so it stopped at its first error and everything downstream silently did not happen. An instance that looks healthy and is not is the more dangerous outcome, which is why the script tees its full output to `/var/log/user-data.log`.
 
 ---
 
-## Key Stats (first 2 weeks live)
+## Repository layout
 
-| Metric | Value |
-|---|---|
-| Total attack events | 18,000+ |
-| Unique attacker IPs | 50+ |
-| Countries of origin | 15+ |
-| Malware deployment attempts | 1 confirmed |
-| IPs auto-blocked | 20+ |
-| Sensors | 2 (us-east-1, us-west-1) |
+```
+analyses/     threat analyses, named by attacker or C2 address
+detections/   Sigma rules mapped to MITRE ATT&CK
+terraform/    infrastructure as code and bootstrap template
+screenshots/  dashboards, sensor breakdowns, Lambda and NACL evidence
+```
 
----
+## Roadmap
 
-## First Dashboard (Day 1)
-The project on its first day vs after two weeks of live data:
+- Out-of-band packet capture triggered on the `/dev/tcp/` alert, to recover the payload from the wire that Cowrie's file capture cannot store
+- Attack range: a Linux endpoint reporting to the existing Wazuh manager for running attack simulations and tuning detections against them, then Windows and Active Directory
+- ATT&CK coverage matrix across all rules
 
-![First dashboard](screenshots/FIRSTdashboardscreenshot.png)
+## Related labs
 
----
-
-## Author
-**Hubert Miecznikowski**  
-[github.com/MiecznikH](https://github.com/MiecznikH)  
-CompTIA Security+ | Cisco CCNA | AWS Solutions Architect Associate | Google IT Support Specialist
+- Windows LOLBin Detection Lab
+- Linux Security Monitoring Lab

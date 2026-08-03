@@ -1,0 +1,44 @@
+title: File Transfer to Cowrie SSH Honeypot
+id: 1a6db9da-3177-43da-bdcc-fe4da05049de
+status: experimental
+description: |
+  Detects any file transferred onto a Cowrie SSH honeypot, whether fetched by the
+  attacker with a tool such as curl or wget, or pushed in over SCP/SFTP. A honeypot
+  serves no legitimate purpose and holds nothing worth retrieving, so a file arriving
+  on it has no benign explanation. In observed activity this event marks the staging
+  step of a compromise, where a loader pulls its payload from a hardcoded C2 host
+  immediately after gaining shell access.
+  Coverage is limited to the curl and wget download paths and to SCP/SFTP pushes,
+  because those are the transfers Cowrie instruments and turns into file events. The
+  raw Bash /dev/tcp socket fallback produces no file event at all and is therefore out
+  of scope for this rule; it is covered by cowrie_dev_tcp_socket_transfer.yml, which
+  matches on command input instead. Deploy both to cover the full fallback chain.
+references:
+    - https://github.com/MiecznikH/soc-honeypot-lab/blob/main/analyses/threat-analysis-43.100.32.28.md
+    - https://github.com/MiecznikH/soc-honeypot-lab/blob/main/analyses/threat-analysis-101.200.132.92.md
+    - https://docs.cowrie.org/en/latest/README.html
+author: MiecznikH
+date: 2026/07/16
+tags:
+    - attack.command-and-control
+    - attack.t1105
+logsource:
+    product: cowrie
+    service: ssh
+detection:
+    selection:
+        eventid:
+            - 'cowrie.session.file_download'
+            - 'cowrie.session.file_upload'
+    condition: selection
+fields:
+    - src_ip
+    - session
+    - url
+    - outfile
+    - shasum
+    - destfile
+falsepositives:
+    - Own administrative testing or sensor validation performed against the honeypot
+    - Automated scanners that fetch a harmless probe file to confirm the host is exploitable
+level: high

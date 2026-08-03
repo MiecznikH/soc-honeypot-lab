@@ -1,0 +1,40 @@
+title: Bash /dev/tcp Socket Used for File Transfer on Cowrie Honeypot
+id: 7c3f2e18-9b04-4d61-a2e7-58c1f0b9d3a4
+status: experimental
+description: |
+  Detects use of Bash's /dev/tcp pseudo-device to open a raw TCP socket from a session
+  on a Cowrie SSH honeypot. Loaders use this as a last-resort download method when curl
+  and wget are unavailable, and it is the one delivery path Cowrie's file-capture hooks
+  do not instrument, so no file event is produced and the payload is never written to
+  the honeypot's download store. The command itself is still recorded, which makes the
+  command input log the only telemetry source covering this technique. This rule is the
+  counterpart to the file-transfer rule: together they cover the download fallback chain
+  observed in the referenced analysis, where the attacker tried curl, then wget, then a
+  raw socket against a hardcoded C2 host.
+references:
+    - https://github.com/MiecznikH/soc-honeypot-lab/blob/main/analyses/threat-analysis-43.100.32.28.md
+    - https://attack.mitre.org/techniques/T1105/
+author: MiecznikH
+date: 2026/08/03
+tags:
+    - attack.command-and-control
+    - attack.t1105
+    - attack.defense-evasion
+    - attack.t1059.004
+logsource:
+    product: cowrie
+    service: ssh
+detection:
+    selection:
+        eventid: 'cowrie.command.input'
+        input|contains:
+            - '/dev/tcp/'
+            - '/dev/udp/'
+    condition: selection
+fields:
+    - src_ip
+    - session
+    - input
+falsepositives:
+    - Own administrative testing or sensor validation performed against the honeypot
+level: high
