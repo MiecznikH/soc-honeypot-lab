@@ -30,38 +30,6 @@ Wordlist characteristics: leaked social media credentials (MySpace/Facebook era)
 Sample passwords attempted: `batman12`, `soccer18`, `jeffhardy1`, `houston713`, 
 `jesussaves`, `puertorico`, `andrew2`
 
-The wordlist is c# Threat Analysis: Credential Stuffing Campaign
-**Attacker IP:** 200.31.165.230  
-**Date:** 2026-06-01  
-**Duration:** ~3 minutes (10:09 - 10:12 UTC)  
-**Total attempts:** 300+  
-**Source:** El Salvador (SV) — Fixed Line ISP  
-**AbuseIPDB Score:** 37% malicious confidence, 6 prior reports  
-
----
-
-## Attack Summary
-
-An automated credential stuffing bot originating from El Salvador conducted 
-a high-speed brute force campaign against the honeypot's SSH service on port 
-2222. The bot cycled through a pre-built wordlist at approximately one attempt 
-every 300ms, targeting the root account exclusively.
-
----
-
-## Attack Behaviour
-
-### Phase 1 — Initial Access (T1110.001 - Brute Force: Password Guessing)
-The bot established a new TCP connection for each credential pair rather than 
-reusing sessions. This is characteristic of tools designed to evade 
-rate-limiting and session-based lockout mechanisms.
-
-Connection rate: ~3 attempts/second  
-Target account: root (exclusively)  
-Wordlist characteristics: leaked social media credentials (MySpace/Facebook era)  
-Sample passwords attempted: `batman12`, `soccer18`, `jeffhardy1`, `houston713`, 
-`jesussaves`, `puertorico`, `andrew2`
-
 The wordlist is consistent with large-scale breach compilations — passwords 
 reflect real human choices rather than random generation, suggesting the 
 attacker is using a database of previously compromised credentials.

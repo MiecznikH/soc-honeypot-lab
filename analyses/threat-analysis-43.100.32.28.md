@@ -1,7 +1,7 @@
 # Threat Analysis #4 — Linux/IoT Botnet Loader with Multi-Stage Delivery and a Honeypot Telemetry Gap
 
 **Author:** Hubert (MiecznikH)
-**Sensor:** Cowrie SSH honeypot (AWS, `us-east-1`), logs shipped to Wazuh SIEM
+**Sensor:** Cowrie SSH honeypot (AWS, `us-west-1`), logs shipped to Wazuh SIEM
 **Classification:** Linux/IoT DDoS botnet loader — assessed as Mirai/Gafgyt family (medium confidence, behavioral)
 **Status:** Payload delivery observed; binary not captured (see Key Finding)
 

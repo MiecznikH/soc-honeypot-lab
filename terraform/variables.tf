@@ -10,7 +10,7 @@ variable "key_name" {
 }
 
 variable "admin_cidr" {
-  description = : curl ifconfig.me"
+  description = "CIDR z którego wpuszczam admin SSH. Własne IP w formacie x.x.x.x/32 — do sprawdzenia przez: curl ifconfig.me"
   type        = string
 }
 

@@ -7,17 +7,17 @@
 **Source:** Google LLC (GCP), United States  
 **AbuseIPDB Score:** 77% malicious confidence, 52 prior reports  
 **Last reported:** 2026-06-09 (active threat)  
-**Sensor:** cowrie-honeypot-west (eu-west-1)  
+**Sensor:** cowrie-honeypot-west (us-west-1)  
 
 ---
 
 ## Attack Summary
 
 A Google Cloud-hosted machine conducted the largest single-source attack 
-observed across both honeypot sensors to date. Over 24 hours, the attacker 
-maintained a sustained rate of approximately one connection every 11 seconds, 
-cycling through a credential wordlist of ~8,000 password combinations targeting 
-the root account exclusively.
+observed across both honeypot sensors to date. Over roughly one hour the 
+attacker sustained about 18 events per second — 63,672 events and 7,958 
+login attempts in total — cycling through a credential wordlist of ~8,000 
+password combinations targeting the root account exclusively.
 
 ---
 
@@ -44,7 +44,7 @@ a 6-day gap between campaigns.
 | Beacon command | echo -e "\x6F\x6B" | echo -e "\x6F\x6B" 
 |
 | Attempts | ~300 | 7,958 |
-| Sensor | cowrie-honeypot (us-east-1) | cowrie-honeypot-west (eu-west-1) |
+| Sensor | cowrie-honeypot (us-east-1) | cowrie-honeypot-west (us-west-1) |
 
 The scale difference (300 vs 7,958 attempts) suggests the operator escalated 
 from a test run to a full campaign, or the GCP instance had significantly more 
@@ -55,11 +55,12 @@ resources available.
 ## Attack Behaviour
 
 ### Phase 1 — Initial Access (T1110.001 - Brute Force: Password Guessing)
-7,958 unique credential pairs attempted within approximately 1 hour at 
-~17 connections per second. This is an aggressive high-speed flood with 
-no attempt at throttling or evasion — the attacker prioritised speed over 
-stealth, exhausting their wordlist in under 30 minutes then continuing 
-to hammer the port.
+7,958 unique credential pairs attempted within approximately 1 hour — 
+roughly 2 login attempts per second, inside a total event rate of ~18/s 
+once session and command events are counted. This is an aggressive 
+high-speed flood with no attempt at throttling or evasion — the attacker 
+prioritised speed over stealth, exhausting their wordlist then continuing 
+to hammer the port for the remainder of the hour.
 
 ### Phase 2 — Execution (T1059 - Command and Scripting Interpreter)
 Every successful login immediately executed:
@@ -111,23 +112,27 @@ high-confidence malicious regardless of source IP or geography.
 
 ## Automated Response
 
-Lambda auto-block pipeline added NACL deny rule for 136.113.34.125 upon 
-first Wazuh alert. However, the attacker's 11-second interval meant 
-approximately 7,958 attempts completed before or around the time of blocking.
+No automated response fired. This sensor runs without the Lambda 
+auto-block pipeline deployed on the us-east-1 honeypot — no NACL deny 
+rule was created for 136.113.34.125 at any point during the campaign.
 
-At 17 connections per second, the entire 8,000-password wordlist was 
-exhausted in under 30 minutes. The Lambda block fired but was unable to 
-prevent the bulk of attempts given the attack velocity.
+This is the direct explanation for the volume. The attack did not end 
+because a defence stopped it; it ended when the attacker exhausted their 
+own wordlist. All 7,958 credential pairs and 63,672 events completed 
+unopposed, which is why this campaign dwarfs those recorded on the 
+us-east-1 sensor, where auto-blocking terminated attacks mid-run.
 
-This highlights a potential improvement: trigger blocking on 
-`cowrie.session.connect` (level 6) rather than `cowrie.login.success` 
-(level 8) to block earlier in the attack chain.
+The uncontrolled sample has analytical value — it shows the full shape of 
+a campaign that blocking would have truncated, and it is what made the 
+HASSH correlation with the June 1st campaign possible at this scale. That 
+value is an accident of configuration, not a deliberate control, and the 
+gap should be closed.
 
 ---
 
 ## Threat Intelligence
 
-AbuseIPDB enrichment performed automatically at time of block:
+AbuseIPDB lookup for 136.113.34.125:
 - **Country:** United States
 - **ISP:** Google LLC
 - **Usage Type:** Data Center/Web Hosting/Transit
@@ -141,7 +146,9 @@ AbuseIPDB enrichment performed automatically at time of block:
 
 ## Recommended Actions
 1. **Report to Google:** abuse@google.com with this IP and timeframe
-2. **Lower alert threshold:** trigger Lambda block on level 6 
-   (cowrie.session.connect) not level 8 (cowrie.login.success)
+2. **Deploy auto-blocking to us-west-1:** this sensor has no Lambda 
+   pipeline at all — that is the primary gap this campaign exposed. When 
+   deployed, trigger on level 6 (cowrie.session.connect) rather than 
+   level 8 (cowrie.login.success) to block earlier in the attack chain
 3. **HASSH blocklist:** consider proactive blocking of HASSH 
    `01ca35584ad5a1b66cf6a9846b5b2821` across both sensors

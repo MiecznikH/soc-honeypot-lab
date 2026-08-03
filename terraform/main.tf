@@ -46,7 +46,7 @@ resource "aws_security_group" "honeypot" {
   name        = "cowrie-honeypot-sg"
   description = "Honeypot: Bait na 22 dla swiata, admin SSH tylko z admin IP"
   vpc_id      = data.aws_vpc.default.id
-/
+
   # Bait: port 22 otwarty dla świata. iptables przekieruje go na 2222 (Cowrie).
   ingress {
     description = "Cowrie bait (redirected to 2222)"

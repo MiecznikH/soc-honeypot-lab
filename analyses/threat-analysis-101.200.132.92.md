@@ -5,7 +5,7 @@
 **Source:** Aliyun Computing Co. (Alibaba Cloud), China  
 **AbuseIPDB Score:** 65% malicious confidence, 52 prior reports  
 **C2 AbuseIPDB Score:** 0% — fresh/rotating infrastructure  
-**Sensor:** cowrie-honeypot-west (eu-west-1)  
+**Sensor:** cowrie-honeypot-west (us-west-1)  
 
 ---
 
@@ -150,10 +150,17 @@ Linux botnets.
 ---
 ## Automated Response
 
-Lambda auto-block fired on `cowrie.login.success` alert, adding 
-101.200.132.92 to the NACL deny list. However the attacker executed 
-all commands within milliseconds of authentication — the full attack 
-chain completed before the block took effect.
+No automated response fired. This sensor runs without the Lambda 
+auto-block pipeline deployed on the us-east-1 honeypot — no Wazuh alert 
+triggered an outbound action and no NACL deny rule was created at any 
+point during the session.
+
+The attacker therefore completed the full chain uninterrupted: 
+reconnaissance, payload fetch, and execution, all within milliseconds of 
+authentication. Even with the pipeline in place the outcome would likely 
+have been the same here — the commands ran faster than an alert-driven 
+block can respond — but on this sensor the question never arose, because 
+there was nothing to intervene.
 
 On a real system this would have resulted in successful malware 
 deployment. The honeypot safely contained all execution attempts.

@@ -61,7 +61,7 @@ systemctl enable --now cowrie
 ########################################
 # 3. Agent Wazuh — przypięta wersja
 ########################################
-curl -sO "https://packages.wazuh.com/4.x/apt/pool/main/w/wazuh-agent/wazuh-agent_${wazuh_agent_version}_amd64.deb"
+curl -fsSLO "https://packages.wazuh.com/4.x/apt/pool/main/w/wazuh-agent/wazuh-agent_${wazuh_agent_version}_amd64.deb"
 WAZUH_MANAGER="${manager_ip}" WAZUH_AGENT_NAME="${agent_name}" \
   dpkg -i "./wazuh-agent_${wazuh_agent_version}_amd64.deb"
 

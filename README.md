@@ -2,8 +2,8 @@
 
 A fully automated threat detection and response pipeline hosted on AWS. 
 Real SSH honeypots catch live attacks from across the internet, feed them 
-into a SIEM, enrich attacker IPs with threat intelligence, and automatically 
-block them — all without human intervention.
+into a SIEM, enrich attacker IPs with threat intelligence, and — on the 
+protected sensor — block them automatically, without human intervention.
 
 Built as a portfolio project to demonstrate practical SOC, cloud, and 
 detection engineering skills using real-world attack data.
@@ -17,17 +17,17 @@ flowchart TD
     A[🌍 Internet Attackers] --> B
     A --> C
 
-    B[🪤 cowrie-honeypot\nus-east-1]
-    C[🪤 cowrie-honeypot-west\neu-west-1]
+    B[🪤 cowrie-honeypot<br/>us-east-1<br/>auto-block enabled]
+    C[🪤 cowrie-honeypot-west<br/>us-west-1<br/>no auto-block]
 
-    B --> D[📊 Wazuh SIEM\nAWS EC2 m7i-flex.large]
+    B --> D[📊 Wazuh SIEM<br/>AWS EC2 m7i-flex.large]
     C --> D
 
-    D --> E[⚡ AWS Lambda\nhoneypot-ip-blocker]
+    D -->|alerts from us-east-1 only| E[⚡ AWS Lambda<br/>honeypot-ip-blocker]
 
-    E --> F[🔍 AbuseIPDB\nThreat Enrichment]
-    E --> G[🚫 Network ACL\nAuto-Block]
-    E --> H[📝 CloudWatch\nEnriched Logs]
+    E --> F[🔍 AbuseIPDB<br/>Threat Enrichment]
+    E --> G[🚫 Network ACL<br/>Auto-Block]
+    E --> H[📝 CloudWatch<br/>Enriched Logs]
 
     H --> I[📈 Grafana Dashboard]
 
@@ -54,9 +54,9 @@ flowchart TD
 
 ## Features
 
-- **Dual-sensor deployment** across two AWS regions (us-east-1, eu-west-1) for geographic attack correlation
+- **Dual-sensor deployment** across two AWS regions (us-east-1, us-west-1) for geographic attack correlation
 - **Real-time threat enrichment** — every attacker IP automatically scored against AbuseIPDB, returning country, ISP, abuse confidence score, and prior report count
-- **Automated IP blocking** — Lambda fires on every Wazuh alert and adds attacker IP to a Network ACL deny list within seconds
+- **Automated IP blocking** — Lambda fires on Wazuh alerts from the us-east-1 sensor and adds the attacker IP to a Network ACL deny list within seconds; us-west-1 runs unprotected as an uncontrolled reference sample, which is what makes the volume comparison between the two sensors meaningful
 - **Custom Wazuh detection rules** mapped to MITRE ATT&CK framework
 - **Cross-sensor attacker attribution** via HASSH SSH client fingerprinting
 - **Full attack chain logging** — credentials attempted, commands executed, malware download attempts, C2 communication
@@ -100,21 +100,23 @@ flowchart TD
 
 ## Threat Analysis Reports
 
-eal attack investigations conducted using data collected by this lab:
+Real attack investigations conducted using data collected by this lab:
 
-### [1. Credential Stuffing Campaign — El Salvador (2026-06-01)](threat-analysis-200.31.165.230.md)
+### [1. Credential Stuffing Campaign — El Salvador (2026-06-01)](analyses/threat-analysis-200.31.165.230.md)
 Automated botnet from a compromised Salvadoran ISP machine cycling through 
 300+ passwords against the root account at 3 attempts/second. HASSH fingerprint 
 `01ca35584ad5a1b66cf6a9846b5b2821` identified as a key IOC.
 
-### [2. Large-Scale GCP Credential Flood — United States (2026-06-07)](threat-analysis-136.113.34.125.md)
-63,672 events in a single hour from a Google Cloud instance — 17 connections 
-per second sustained for 60 minutes. **HASSH fingerprint matched the June 1st 
-El Salvador campaign**, linking both attacks to the same malware kit or operator 
-despite different source countries and a 6-day gap. Cross-sensor attribution 
-via HASSH demonstrated.
+### [2. Large-Scale GCP Credential Flood — United States (2026-06-07)](analyses/threat-analysis-136.113.34.125.md)
+63,672 events in a single hour from a Google Cloud instance — ~18 events 
+per second sustained for 60 minutes, across 7,958 login attempts. Landed on 
+the unprotected us-west-1 sensor, so nothing stopped it: the campaign ended 
+when the attacker exhausted their wordlist, not when a block fired. 
+**HASSH fingerprint matched the June 1st El Salvador campaign**, linking both 
+attacks to the same malware kit or operator despite different source countries 
+and a 6-day gap. Cross-sensor attribution via HASSH demonstrated.
 
-### [3. Malware Deployment Attempt — China/Alibaba Cloud (2026-06-03)](threat-analysis-101.200.132.92.md)
+### [3. Malware Deployment Attempt — China/Alibaba Cloud (2026-06-03)](analyses/threat-analysis-101.200.132.92.md)
 Most technically sophisticated attack observed. Post-authentication malware 
 staging using a 3-fallback downloader (curl → wget → raw TCP), UPX-packed 
 binary, base64-encoded C2 config, and a clean C2 server on Alibaba Cloud HK 
@@ -146,7 +148,7 @@ cryptominer or Mirai botnet deployment.
 | Countries of origin | 15+ |
 | Malware deployment attempts | 1 confirmed |
 | IPs auto-blocked | 20+ |
-| Sensors | 2 (us-east-1, eu-west-1) |
+| Sensors | 2 (us-east-1, us-west-1) |
 
 ---
 
